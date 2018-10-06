@@ -1,0 +1,201 @@
+---
+title: "Beth's mixed results: isolated items and pairs"
+output:
+  word_document:
+    reference_docx: template.docx
+  pdf_document: default
+---
+
+Date: `r Sys.Date()`
+
+<br>
+
+<!-- loading packages, user-defined functions and datasets -->
+```{r echo=FALSE, warning=FALSE, message=FALSE, cache=FALSE, include=FALSE}
+libs <- c("magrittr", "tidyverse", "knitr",
+          "lme4", "sjstats", "TMB")
+lapply(libs, require, character.only = TRUE)
+load(file="ws_06_10_18.RData")
+```
+
+<br>
+
+<!-- set folder for graphs -->
+```{r opts, echo = FALSE}
+knitr::opts_chunk$set(
+  fig.path = "images/"
+)
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+#  fit models
+mod_item1 <- glmer(recalled ~ stimulus_type + age_month + (1 | id),
+             data = df_isolated_item, family = binomial)
+mod_item2 <- glmer(recalled ~ stimulus_type * age_month + (1 | id),
+                   data = df_isolated_item, family = binomial)
+
+mod_pair1 <- glmer(recalled ~ stimulus_type + age_month + (1 | id),
+                  data = df_isolated_pair, family = binomial)
+mod_pair2 <- glmer(recalled ~ stimulus_type * age_month + (1 | id),
+                  data = df_isolated_pair, family = binomial)
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+#  functions for tables
+p_value_table <- function(model, interaction = FALSE) {
+  if (interaction == TRUE) {
+    summary_model <- tibble(Coefficient = c("Intercept", "Stimulus Type", "Age" , "Stimulus Type * Age"), 
+                            `Odds Ratios` = exp(fixef(model))) 
+  } else {
+    summary_model <- tibble(Coefficient = c("Intercept", "Stimulus Type", "Age"), 
+                            `Odds Ratios` = exp(fixef(model))) 
+  }
+  
+  summary_model %>%
+    cbind(exp(confint(model)) %>% 
+            as_tibble() %>% 
+            slice(2:n()) %>%
+            select_all(.funs = funs(paste0("CI ", .)))) %>%
+    (function(x) {
+      p_values = p_value(model, p.kr = TRUE)$p.value
+      
+      cbind(x, tibble(`p-value` = ifelse(p_values < 0.001, "<0.001", round(p_values, 3))))
+    }) %>%
+    rename(`Lower CI 95%` = `CI 2.5 %`, `Upper CI 95%` = `CI 97.5 %`) %>%
+    round_df(3) %>%
+    kable()
+}
+
+r2_table <- function(df, model) {
+  tibble(Observations = df %>% nrow(),
+         `Marginal R2` = r2(model)[[1]],
+         `Conditional R2` = r2(model)[[2]]) %>%
+    round_df(3) %>%
+    kable()
+}
+
+random_effects_table <- function(model) {
+  tibble(`Random effects` = c("σ2", "τ00 Child ID", "ICC Child ID"),
+       Value = c(re_var(model), icc(model))) %>%
+  round_df(3) %>%
+  kable()
+}
+
+mod_comparison_table <- function(model1, model2) {
+  comparison <- anova(model1, model2)
+  comparison %>% as_tibble() %>% round_df(3) %>%
+    kable()
+}
+```
+
+
+#### Demographic info of the sample
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+df_isolated[!duplicated(df_isolated$id),] %>%
+  (function(x) {
+    tibble(Participants = nrow(x),
+           `M age month` = mean(x$age_month),
+           `Range age month` = paste(c(min(x$age_month), max(x$age_month)), collapse = ", "),
+           Boys = nrow(filter(x, gender == "M")))
+  }) %>%
+  round_df(1) %>%
+  kable()
+```
+
+<br>
+
+#### model isolated item 1
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+p_value_table(mod_item1)
+```
+
+<br>
+
+#### model isolated item 2
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+p_value_table(mod_item2, interaction = TRUE)
+```
+
+<br>
+
+#### model isolated pair 1
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+p_value_table(mod_pair1)
+```
+
+<b>
+
+#### model isolated pair 2
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+p_value_table(mod_pair2, interaction = TRUE)
+```
+
+<br>
+
+#### r2 isolated item 1
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+r2_table(df_isolated_item, mod_item1)
+```
+
+<br>
+
+#### r2 isolated item 2
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+r2_table(df_isolated_item, mod_item2)
+```
+
+<br>
+
+#### r2 isolated pair 1
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+r2_table(df_isolated_pair, mod_pair1)
+```
+
+<br>
+
+#### r2 isolated pair 2
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+r2_table(df_isolated_pair, mod_pair2)
+```
+
+<br>
+
+#### random effects isolated item 1
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+random_effects_table(mod_item1)
+```
+
+<br>
+
+#### random effects isolated item 2
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+random_effects_table(mod_item2)
+```
+
+<br>
+
+#### random effects isolated pair 1
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+random_effects_table(mod_pair1)
+```
+
+<br>
+
+#### random effects isolated pair 2
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+random_effects_table(mod_pair2)
+```
+
+<br>
+
+#### model comparison isolated item
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+mod_comparison_table(mod_item1, mod_item2)
+```
+
+<br>
+
+#### model comparison isolated pair
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+mod_comparison_table(mod_pair1, mod_pair2)
+```

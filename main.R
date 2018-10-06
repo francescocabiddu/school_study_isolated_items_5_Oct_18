@@ -1,11 +1,13 @@
 # load libraries
-libs <- c("magrittr", "tidyverse")
+libs <- c("magrittr", "tidyverse", "lme4", "sjstats", "TMB")
 lapply(libs, require, character.only = TRUE)
 
 # load homemade functions
 source("homemade_funs.R")
 
 #### tidy data ####
+# remember to set working directory where .csv file is located (session > set working directory > choose directory)
+# at the bottom of the script items and pairs datasets will be saved in the chosen directory
 df <- "Span Test schools_mixed_version2_13_06_18_5 October 2018_13.05.csv" %>%
   read.delim(sep=",", header=F, stringsAsFactors = F, check.names = F)
 
@@ -31,7 +33,7 @@ df <- df[-c(1,2),]
 df %<>%
   slice(-1:-12)
 
-# delete empty row
+# delete empty row (SPECIFIC TO CURRENT DATASET)
 df %<>%
   slice(-57)
   
@@ -47,11 +49,11 @@ df$age <- as.Date(paste("15", df$age, sep = " "), "%d %m %Y")
 # convert age in age in months
 df$age_month <-  abs(mondf(df$`StartDate&Start Date`, df$age))
 
-# change wrong dates input
+# change wrong dates input (SPECIFIC TO CURRENT DATASET)
 df$age_month[57] <- 62
 df$age_month[58] <- 67
 
-# change wrong id
+# change wrong id (SPECIFIC TO CURRENT DATASET)
 df$`id&id`[23] <- "DS_C23"
 
 #filter df for new coloums 
@@ -136,7 +138,6 @@ df %<>%
   filter(resp < resp[1]) 
 
 # assign position (on empty position) to each isolated/pair element in df_isolated
-# assign position (on empty position) to each isolated/pair element in spa_mix_prop_df
 df_isolated %<>%
   mutate(single_d_resp = single_d,
          pair_d_resp = pair_d,
@@ -205,9 +206,64 @@ df_isolated %<>%
     x1 %>%
       cbind(x2 %>% select(stimulus_resp, response))
   })  %>%
-  select(-id1, -list1) %>%
+  select(-id1, -list1, -stimulus_resp) %>%
   arrange(id, list, seq) %>%
   mutate(response = ifelse(is.na(isolated_x), NA, response)) 
 
+# unlist in different rows elements of df_isolated$isolated_x e df_isolated$response
+unlist_rows <- function(df, i) {
+  tibble(id = df$id[i],
+         age_month = df$age_month[i],
+         gender = df$gender[i],
+         list = df$list[i],
+         seq_num = df$seq_num[i],
+         seq = df$seq[i],
+         len_seq = df$len_seq[i],
+         stimulus_type = df$stimulus_type[i],
+         isolated_x = df$isolated_x[[i]] %>% sapply(paste0, collapse = " "),
+         response = df$response[[i]] %>% unlist())
+} 
 
-  
+df_isolated %<>%
+  (function(x) {
+    new_df <- unlist_rows(df_isolated, 1)
+    for (i in 2:nrow(df_isolated)) {
+      new_df %<>%
+        rbind(unlist_rows(df_isolated, i))
+    }
+    
+    new_df %>% mutate(isolated_x = ifelse(isolated_x == "NA", NA, isolated_x)) %>%
+      na.omit()
+  })
+
+# make two df for isolated items and pairs (long format for R analysis)
+df_isolated_item <- df_isolated %>% 
+  filter(stimulus_type %in% c("single_d", "single_w")) %>%
+  mutate(recalled = response %>% as.integer() %>% as.factor()) %>%
+  select(-response)
+
+df_isolated_pair <- df_isolated %>% 
+  filter(stimulus_type %in% c("pair_d", "pair_w")) %>%
+  mutate(recalled = response %>% as.integer() %>% as.factor()) %>%
+  select(-response)
+
+#### make dataset in wide format for items and pairs (ready for SPSS) and save them to working directory ####
+df_wide <- function(df, stimuli, name_file) {
+  # stimuli: a vector with stimulus_type names e.g. c("single_d", "single_w")
+  df %>%
+    filter(stimulus_type %in% stimuli) %>%
+    mutate(i = row_number()) %>%
+    spread(stimulus_type, isolated_x) %>%
+    arrange(i) %>%
+    mutate(recalled = response %>% as.integer() %>% as.factor()) %>%
+    select(-i, - response, - len_seq, -seq_num) %>%
+    write.table(file = paste(name_file, ".csv", sep = ""), 
+                sep = ",", 
+                quote = FALSE,
+                row.names = FALSE)
+}
+
+df_wide(df_isolated, c("single_d", "single_w"), "df_isolated_item")
+df_wide(df_isolated, c("pair_d", "pair_w"), "df_isolated_pair")
+
+
