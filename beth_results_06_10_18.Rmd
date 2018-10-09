@@ -15,7 +15,7 @@ Date: `r Sys.Date()`
 libs <- c("magrittr", "tidyverse", "knitr",
           "lme4", "sjstats", "TMB")
 lapply(libs, require, character.only = TRUE)
-load(file="ws_06_10_18.RData")
+load(file="ws_09_10_18.RData")
 ```
 
 <br>
@@ -35,6 +35,9 @@ df_isolated_item %<>%
   filter(age_month <= 131)
 
 df_isolated_pair %<>%
+  filter(age_month <= 131)
+
+df_mixed_recalled %<>%
   filter(age_month <= 131)
 
 #  fit models
@@ -236,4 +239,17 @@ isolated_plot(df_isolated_item, "Isolated items", "items")
 #### isolated pairs plot
 ```{r echo=FALSE, warning=FALSE, message=FALSE, fig.width=7, fig.height=5}
 isolated_plot(df_isolated_pair, "Isolated pairs", "pairs")
+```
+
+<br>
+
+#### total of mixed lists recalled
+```{r echo=FALSE, warning=FALSE, message=FALSE, fig.width=7, fig.height=5}
+ggplot(df_mixed_recalled, aes(x=age_month, y=recalled_total)) +
+  geom_jitter(height = 0.25, width = 0.25, size = 0.3) +
+  geom_smooth(method='lm', colour = 'black', size = 0.3) +
+  ggtitle("Mixed lists") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  labs(x = "Age in months", y = paste("Number of mixed lists recalled", sep = "")) +
+  scale_y_continuous(limits=c(-0.3,8))
 ```

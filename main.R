@@ -81,6 +81,37 @@ df$len_seq <- sapply(df$seq, function(x) length(str_split(x, " ")[[1]]))
 df %<>%
   select(id:gender, list, seq_num, seq, len_seq, num, resp)
 
+# table of number of mixed list recalled
+df_mixed_recalled <- df %>%
+  (function(x) {
+    # table of correct responses as reference
+    corr_table <- x %>%
+      distinct(seq_num, seq, num) %>%
+      filter(num != "other") %>%
+      group_by(seq) %>%
+      mutate(corr_resp = c(length(seq), 1:(length(seq)-1)))
+    
+    # check if the participant gave the correct response of each stimulus
+    x %<>% 
+      inner_join(corr_table, x, by = c("seq_num", "seq", "num")) %>%
+      mutate(corr_resp = resp == corr_resp)
+    
+    # arrange x by id
+    x %<>%
+      arrange(id)
+    
+    # create a variable of correct list recall
+    x %<>%
+      group_by(id, seq) %>%
+      mutate(corr_list = ifelse(sum(corr_resp) == length(corr_resp), TRUE, FALSE))
+    
+    x %>%
+      group_by(id, age_month, gender, list, seq_num, seq) %>%
+      summarise(recalled_list = ifelse(sum(corr_list) > 0, TRUE, FALSE)) %>%
+      group_by(id, age_month, gender) %>%
+      summarise(recalled_total = sum(recalled_list))
+  })
+
 # arrange df by id
 df %<>%
   arrange(id)
@@ -265,5 +296,3 @@ df_wide <- function(df, stimuli, name_file) {
 
 df_wide(df_isolated, c("single_d", "single_w"), "df_isolated_item")
 df_wide(df_isolated, c("pair_d", "pair_w"), "df_isolated_pair")
-
-
