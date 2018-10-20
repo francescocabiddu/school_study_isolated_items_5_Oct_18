@@ -50,6 +50,9 @@ mod_pair1 <- glmer(recalled ~ stimulus_type + age_month + (1 | id),
                   data = df_isolated_pair, family = binomial)
 mod_pair2 <- glmer(recalled ~ stimulus_type * age_month + (1 | id),
                   data = df_isolated_pair, family = binomial)
+
+mod_mixed <- lm(recalled_total ~ age_month, data = df_mixed_recalled) 
+summary_mod_mixed <- summary(mod_mixed)
 ```
 
 ```{r echo=FALSE, warning=FALSE, message=FALSE}
@@ -216,29 +219,27 @@ mod_comparison_table(mod_pair1, mod_pair2)
 
 #### isolated items plot
 ```{r echo=FALSE, warning=FALSE, message=FALSE, fig.width=7, fig.height=5}
-isolated_plot <- function(df, title, stimulus_type_label) {
+isolated_plot <- function(df, stimulus_type_label) {
   df %>%
     group_by(id, age_month, stimulus_type) %>%
     mutate(recalled = recalled %>% as.character() %>% as.integer()) %>%
     summarize(recalled_total = sum(recalled)) %>%
     ggplot(aes(x = age_month, y = recalled_total, shape = stimulus_type, linetype = stimulus_type)) +
     geom_jitter(height = 0.25, width = 0.25) +
-    ggtitle(title) +
-    theme(plot.title = element_text(hjust = 0.5)) +
-    labs(x = "Age in months", y = paste("Number of ", stimulus_type_label, " accurately recalled", sep = "")) +
+    labs(x = "Age in months", y = paste(stimulus_type_label, " accurately recalled", sep = "")) +
     geom_smooth(method='lm', colour = 'black', size = 0.3) +
-    scale_shape_manual(name = "List", labels = c("Digits", "Words"), values = c(0, 3)) + 
-    scale_linetype_manual(name = "List", labels = c("Digits", "Words"), values = c("solid", "dotted")) 
+    scale_shape_manual(name = "", labels = c("Digits", "Words"), values = c(0, 3)) + 
+    scale_linetype_manual(name = "", labels = c("Digits", "Words"), values = c("solid", "dotted")) 
 }
 
-isolated_plot(df_isolated_item, "Isolated items", "items")
+isolated_plot(df_isolated_item, "Items")
 ```
 
 <br>
 
 #### isolated pairs plot
 ```{r echo=FALSE, warning=FALSE, message=FALSE, fig.width=7, fig.height=5}
-isolated_plot(df_isolated_pair, "Isolated pairs", "pairs")
+isolated_plot(df_isolated_pair, "Pairs")
 ```
 
 <br>
@@ -248,8 +249,30 @@ isolated_plot(df_isolated_pair, "Isolated pairs", "pairs")
 ggplot(df_mixed_recalled, aes(x=age_month, y=recalled_total)) +
   geom_jitter(height = 0.25, width = 0.25, size = 0.3) +
   geom_smooth(method='lm', colour = 'black', size = 0.3) +
-  ggtitle("Mixed lists") +
-  theme(plot.title = element_text(hjust = 0.5)) +
-  labs(x = "Age in months", y = paste("Number of mixed lists recalled", sep = "")) +
+  labs(x = "Age in months", y = paste("Mixed lists recalled", sep = "")) +
   scale_y_continuous(limits=c(-0.3,8))
+```
+
+<br>
+
+#### mixed lists model tables
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+cbind(summary_mod_mixed$coefficients[,1],
+      confint(mod_mixed),
+      summary_mod_mixed$coefficients[,4]) %>%
+  round(3) %>%
+  as_tibble() %>%
+  rename_all(funs(c("Estimate", "2.5", "97.5", "p-value"))) %>%
+  kable()
+```
+
+<br>
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+tibble(Observations = nrow(df_mixed_recalled), 
+       R2 = summary_mod_mixed$r.squared,
+       `Adjusted R2` = summary_mod_mixed$adj.r.squared) %>%
+  round(2) %>%
+  kable()
 ```
